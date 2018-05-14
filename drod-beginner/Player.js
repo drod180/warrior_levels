@@ -1,6 +1,7 @@
 class Player {
 
   playTurn(warrior) {
+
     if (this.shouldHeal()) {
       warrior.rest();
     } else {
@@ -27,4 +28,9 @@ class Player {
   shouldHeal(warrior) {
     return (!this.beingAttacked() && warrior.health() < Player.startingHealth)
   }
+}
+
+class PlayetStats {
+
+  
 }
