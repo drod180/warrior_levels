@@ -10,7 +10,12 @@ class Player {
     if (brain.shouldHeal()) {
       warrior.rest();
       brain.setPreviousAction("rest");
-    } else {
+    }
+    else if (brain.shouldFlee()) {
+      warrior.walk("backward");
+      brain.setPreviousAction("flee");
+    }
+    else {
       this.makeAction(warrior, brain);
     }
 
@@ -18,27 +23,61 @@ class Player {
   }
 
   makeAction(warrior, brain) {
-    let direction = brain.direction;
+    let direction = brain.determineDirection();
+    let spaces = warrior.look();
+    let distance = brain.determineDistance(warrior, direction);
 
-    if (warrior.feel(direction).isWall()) {
-      direction = brain.reverseDirection();
-    }
-
-    if (warrior.feel(direction).isCaptive()) {
-      warrior.rescue(direction);
-      brain.setPreviousAction("rescue");
-    }
-    else if (warrior.feel(direction).isEmpty()) {
-      direction = brain.determineDirection(warrior);
+    if (distance == -1) {
       warrior.walk(direction);
       brain.setPreviousAction("walk");
     }
+    else if (spaces[distance].isWall()) {
+      this.wallReact(warrior, brain, direction, distance);
+    }
+    else if (spaces[distance].isCaptive()) {
+      this.smartRescue(warrior, brain, direction, distance)
+    }
+    else if (brain.shouldPivot()) {
+      warrior.pivot();
+      brain.setPreviousAction("pivot");
+    }
     else {
-      warrior.attack(direction);
+      this.smartAttack(warrior, brain, direction, distance);
+    }
+  }
+
+  smartAttack(warrior, brain, direction, distance) {
+    if (distance > 0) {
+      warrior.shoot();
+      brain.setPreviousAction("shoot");
+    }
+    else {
+      warrior.attack();
       brain.setPreviousAction("attack");
     }
   }
 
+  smartRescue(warrior, brain, direction, distance) {
+    if (distance > 0){
+      warrior.walk(direction);
+      brain.setPreviousAction("walk");
+    }
+    else {
+      warrior.rescue(direction);
+      brain.setPreviousAction("rescue");
+    }
+  }
+
+  wallReact(warrior, brain, direction, distance) {
+    if (distance > 0){
+      warrior.walk(direction);
+      brain.setPreviousAction("walk");
+    }
+    else {
+      warrior.pivot();
+      brain.setPreviousAction("pivot");
+    }
+  }
 }
 
 class PlayerBrain {
@@ -47,7 +86,7 @@ class PlayerBrain {
     this.startingHealth = startingHealth;
     this.previousHealth = startingHealth;
     this.previousAction = "start";
-    this.direction = "backward";
+    this.direction = "forward";
     this.warrior = warrior;
   }
 
@@ -56,21 +95,34 @@ class PlayerBrain {
   }
 
   determineDirection() {
-      if (this.shouldReverse(this.warrior.health())) {
-        this.direction = this.reverseDirection();
-      }
+    if (this.shouldFlee()) {
+      this.direction = this.reverseDirection();
+    }
 
-      return this.direction;
+    return this.direction;
+  }
+
+  determineDistance(warrior, direction) {
+    let position = -1;
+    let spaces = warrior.look(direction);
+
+    for (let i = 2; i >= 0; i--) {
+      if (!spaces[i].isEmpty()) {
+        position = i;
+      }
+    }
+
+    return position;
   }
 
   reverseDirection() {
-      if (this.direction == "backward") {
-        this.direction = "forward";
-      } else {
-        this.direction = "backward";
-      }
+    if (this.direction == "backward") {
+      this.direction = "forward";
+    } else {
+      this.direction = "backward";
+    }
 
-      return this.direction;
+    return this.direction;
   }
 
   setPreviousAction(action) {
@@ -81,8 +133,12 @@ class PlayerBrain {
     this.previousHealth = health;
   }
 
-  shouldReverse(health) {
-    return (this.beingAttacked() && health < this.startingHealth / 2);
+  shouldPivot() {
+    return this.direction == "backward";
+  }
+
+  shouldFlee() {
+    return (this.beingAttacked() && this.warrior.health() < this.startingHealth / 2);
   }
 
   shouldHeal() {
